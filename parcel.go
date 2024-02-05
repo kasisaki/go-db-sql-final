@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"log"
 )
 
 type ParcelStore struct {
@@ -22,12 +21,10 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 		sql.Named("address", p.Address),
 		sql.Named("created_at", p.CreatedAt))
 	if err != nil {
-		log.Print("Error adding a new parcel into DB")
 		return 0, err
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		log.Print("Error getting ID of a last insert while adding a new parcel into DB")
 		return 0, err
 	}
 
@@ -44,7 +41,6 @@ func (s ParcelStore) Get(number int) (Parcel, error) {
 	p := Parcel{}
 	err := row.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 	if err != nil {
-		log.Println("Error scanning data from a row while getting a parcel by number")
 		return p, err
 	}
 
@@ -56,12 +52,11 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 	rows, err := s.db.Query("SELECT number, client, status, address, created_at FROM parcel WHERE client = :client",
 		sql.Named("client", client))
 	if err != nil {
-		log.Println("Error getting parcels by client")
 		return []Parcel{}, err
 	}
 
 	// заполняем срез Parcel данными из таблицы
-	var res []Parcel
+	var parcels []Parcel
 
 	for rows.Next() {
 		p := Parcel{}
@@ -69,13 +64,15 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 		// Если возникает ошибка при получении данных из запроса, то возвращаем список, при этом не новый
 		// чтобы часть данных, которая успешно добавлена ранее могла быть выдана по результату запроса
 		if err != nil {
-			log.Println("Error scanning data from a row while getting a parcel by client")
-			return res, err
+			return parcels, err
 		}
-		res = append(res, p)
+		parcels = append(parcels, p)
+	}
+	if err = rows.Err(); err != nil {
+		return parcels, err
 	}
 
-	return res, nil
+	return parcels, nil
 }
 
 func (s ParcelStore) SetStatus(number int, status string) error {
@@ -84,7 +81,6 @@ func (s ParcelStore) SetStatus(number int, status string) error {
 		sql.Named("status", status),
 		sql.Named("number", number))
 	if err != nil {
-		log.Println("Error updating status of a parcel")
 		return err
 	}
 
@@ -102,15 +98,11 @@ func (s ParcelStore) SetAddress(number int, address string) error {
 			sql.Named("address", address),
 			sql.Named("number", number))
 		if err != nil {
-			log.Println("Error updating address of a parcel")
 			return err
 		}
-	} else {
-		log.Println("Address can be changed only for registered parcels")
-		return errors.New("parcel is not registered")
+		return nil
 	}
-
-	return nil
+	return errors.New("parcel is not registered")
 }
 
 func (s ParcelStore) Delete(number int) error {
@@ -124,11 +116,9 @@ func (s ParcelStore) Delete(number int) error {
 		_, err := s.db.Exec("DELETE FROM parcel WHERE number = :number",
 			sql.Named("number", number))
 		if err != nil {
-			log.Println("Error deleting a parcel")
 			return err
 		}
 	} else {
-		log.Println("Only registered parcels can be deleted")
 		return errors.New("parcel is not registered")
 	}
 
@@ -143,7 +133,6 @@ func checkParcelIsRegistered(number int, db *sql.DB) (bool, error) {
 
 	err := row.Scan(&status)
 	if err != nil {
-		log.Println("Error scanning data from a row while getting a parcels status")
 		return false, err
 	}
 
