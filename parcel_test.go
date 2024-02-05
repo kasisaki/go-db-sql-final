@@ -82,7 +82,6 @@ func TestSetAddress(t *testing.T) {
 	err = store.SetAddress(number, newAddress)
 	require.NoError(t, err)
 
-
 	// check
 	parcelFromDb, err := store.Get(number)
 	require.NoError(t, err)
@@ -101,7 +100,7 @@ func TestSetAddress_WhenNotRegistered(t *testing.T) {
 
 	// add
 	number, err := store.Add(parcel)
-	require.Error(t, err, "Adding parcel must not return error")
+	require.NoError(t, err, "Adding parcel must not return error")
 	require.NotNil(t, number, "Number must not be nil")
 	require.NotEqual(t, 0, number, "Number must not be 0")
 
@@ -111,7 +110,6 @@ func TestSetAddress_WhenNotRegistered(t *testing.T) {
 	newAddress := "new test address"
 	err = store.SetAddress(number, newAddress)
 	require.ErrorContains(t, err, "not registered")
-
 
 	// check
 	parcelFromDb, err := store.Get(number)
@@ -155,6 +153,8 @@ func TestGetByClient(t *testing.T) {
 	db, err := sql.Open("sqlite", "tracker.db")
 	require.NoError(t, err, "Error opening DB")
 
+	store := NewParcelStore(db)
+
 	parcels := []Parcel{
 		getTestParcel(),
 		getTestParcel(),
@@ -170,24 +170,27 @@ func TestGetByClient(t *testing.T) {
 
 	// add
 	for i := 0; i < len(parcels); i++ {
-		id, err := // добавьте новую посылку в БД, убедитесь в отсутствии ошибки и наличии идентификатора
+		number, err := store.Add(parcels[i])
+		require.NoError(t, err, "Adding parcel must not return error")
+		require.NotNil(t, number, "Number must not be nil")
+		require.NotEqual(t, 0, number, "Number must not be 0")
 
 		// обновляем идентификатор добавленной у посылки
-		parcels[i].Number = id
+		parcels[i].Number = number
 
 		// сохраняем добавленную посылку в структуру map, чтобы её можно было легко достать по идентификатору посылки
-		parcelMap[id] = parcels[i]
+		parcelMap[number] = parcels[i]
 	}
 
 	// get by client
-	storedParcels, err := // получите список посылок по идентификатору клиента, сохранённого в переменной client
-	// убедитесь в отсутствии ошибки
-	// убедитесь, что количество полученных посылок совпадает с количеством добавленных
+	storedParcels, err := store.GetByClient(client)
+	require.NoError(t, err, "Getting parcels by client must not return error")
+	require.Equal(t, len(parcelMap), len(storedParcels))
 
 	// check
 	for _, parcel := range storedParcels {
-		// в parcelMap лежат добавленные посылки, ключ - идентификатор посылки, значение - сама посылка
-		// убедитесь, что все посылки из storedParcels есть в parcelMap
-		// убедитесь, что значения полей полученных посылок заполнены верно
+		parcelFromMap, ok := parcelMap[parcel.Number]
+		require.True(t, ok)
+		require.Equal(t, parcelFromMap, parcel)
 	}
 }
